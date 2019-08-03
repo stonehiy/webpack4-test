@@ -1,5 +1,4 @@
 //config/webpack.dev.js
-//https://www.jianshu.com/p/6712e4e4b8fe
 // mac 权限问题 npm i --unsafe -perm
 //当前应用安装 npm i --save-dev
 

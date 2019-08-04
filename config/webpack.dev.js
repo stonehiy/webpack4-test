@@ -26,7 +26,7 @@ module.exports = {
     entry: {
         //main:["other.js","./src/main.js"]//配置多页面的两种方法
         main: "./src/main.js",
-        main2: "./src/main2.js", //这里新添加一个入口文件
+        mainThree: "./src/mainThree.js", //这里新添加一个入口文件
     },
     //打包环境：development & production
     mode: "development",
@@ -87,8 +87,20 @@ module.exports = {
                 removeAttributeQuotes: true  //removeAttrubuteQuotes是却掉属性的双引号。
             },
             hash: true, //为了开发中js有缓存效果，所以加入hash，这样可以有效避免缓存JS。
-            template: "./src/index.html" //是要打包的html模版路径和文件名称。
-
+            template: "./src/index.html" ,//是要打包的html模版路径和文件名称。
+            filename: "index.html",
+            title: "index App",
+            chunks: ['main']
+        }),
+        new htmlPlugin({
+            minify: { //是对html文件进行压缩
+                removeAttributeQuotes: true  //removeAttrubuteQuotes是却掉属性的双引号。
+            },
+            hash: true, //为了开发中js有缓存效果，所以加入hash，这样可以有效避免缓存JS。
+            template: "./src/indexThree.html" ,//是要打包的html模版路径和文件名称。
+            filename: "indexThree.html",
+            title: "Three Js App",
+            chunks: ['mainThree']
         }),
         new extractTextPlugin("css/[name].css?[hash:8]"),
         new PurifyCSSPlugin({

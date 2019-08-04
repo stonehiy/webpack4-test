@@ -2,4 +2,5 @@
 
 import css from './css/index.css'
 
-//alert("11111")
+
+document.getElementById("study").innerHTML="hello webpack"

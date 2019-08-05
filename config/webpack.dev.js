@@ -52,9 +52,20 @@ module.exports = {
                 //     {loader:"css-loader"}
                 // ]
             },
+            {
+                test: /\.(gltf|glb|bin)(\?.*)?$/,
+                use: [{
+                    loader: 'file-loader',
+                    options: {
+                        // limit: 10000,
+                        outputPath: 'static/models/gltf/',
+                    },
+                }],
+
+            },
             //图片 loader
             {
-                test: /\.(png|jpg|gif|jpeg)/,  //是匹配图片文件后缀名称
+                test: /\.(png|jpe?g|gif|jpeg|svg)(\?.*)?$/,  //是匹配图片文件后缀名称
                 use: [{
                     loader: 'url-loader', //是指定使用的loader和loader的配置参数
                     options: {
@@ -87,7 +98,7 @@ module.exports = {
                 removeAttributeQuotes: true  //removeAttrubuteQuotes是却掉属性的双引号。
             },
             hash: true, //为了开发中js有缓存效果，所以加入hash，这样可以有效避免缓存JS。
-            template: "./src/index.html" ,//是要打包的html模版路径和文件名称。
+            template: "./src/index.html",//是要打包的html模版路径和文件名称。
             filename: "index.html",
             title: "index App",
             chunks: ['main']
@@ -97,7 +108,7 @@ module.exports = {
                 removeAttributeQuotes: true  //removeAttrubuteQuotes是却掉属性的双引号。
             },
             hash: true, //为了开发中js有缓存效果，所以加入hash，这样可以有效避免缓存JS。
-            template: "./src/indexThree.html" ,//是要打包的html模版路径和文件名称。
+            template: "./src/indexThree.html",//是要打包的html模版路径和文件名称。
             filename: "indexThree.html",
             title: "Three Js App",
             chunks: ['mainThree']

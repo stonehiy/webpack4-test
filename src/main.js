@@ -5,6 +5,8 @@ import * as THREE from 'three';
 
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {SkeletonUtils} from 'three/examples/jsm/utils/SkeletonUtils.js';
+import Soldier from './static/models/gltf/Soldier.glb'
+import Parrot from './static/models/gltf/Parrot.glb'
 //////////////////////////////
 // Global objects
 //////////////////////////////
@@ -22,8 +24,8 @@ var mixers = []; // All the THREE.AnimationMixer objects for all the animations 
 // meshes, armatures and animations to use. We will load the whole scene for each object and clone it for each unit.
 // Models are from https://www.mixamo.com/
 var MODELS = [
-    {name: "Soldier"},
-    {name: "Parrot"},
+    {name: Soldier},
+    {name: Parrot},
     // { name: "RiflePunch" },
 ];
 // Here we define instances of the models that we want to place in the scene, their position, scale and the animations
@@ -95,6 +97,7 @@ function loadModels() {
             }
         });
     }
+
 }
 
 /**
@@ -179,8 +182,8 @@ function getModelByName(name) {
  */
 function loadGltfModel(model, onLoaded) {
     var loader = new GLTFLoader();
-    var modelName = "static/models/gltf/" + model.name + ".glb";
-    loader.load(modelName, function (gltf) {
+    // var modelName = "static/models/gltf/" + model.name + ".glb";
+    loader.load(model.name, function (gltf) {
         var scene = gltf.scene;
         model.animations = gltf.animations;
         model.scene = scene;

@@ -53,13 +53,15 @@ module.exports = {
             },
             {
                 test: /\.(gltf|glb|bin)(\?.*)?$/,
-                use: [{
-                    loader: 'file-loader',
-                    options: {
-                        // limit: 10000,
-                        outputPath: 'static/models/gltf/',
+                use: [
+                    {
+                        loader: 'file-loader',
+                        options: {
+                            name: '[path][name].[ext]',
+                            // outputPath: 'static/models/gltf/',
+                        },
                     },
-                }],
+                ],
 
             },
             //图片 loader

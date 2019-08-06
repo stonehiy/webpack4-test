@@ -57,8 +57,8 @@ module.exports = {
                     {
                         loader: 'file-loader',
                         options: {
-                            name: '[path][name].[ext]',
-                            // outputPath: 'static/models/gltf/',
+                            name: '[name].[ext]',
+                            outputPath: 'static/models/gltf/',
                         },
                     },
                 ],

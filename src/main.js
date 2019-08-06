@@ -32,28 +32,28 @@ var MODELS = [
 // that must be played.
 var UNITS = [
     {
-        modelName: "Soldier", // Will use the 3D model from file models/gltf/Soldier.glb
+        modelName: Soldier, // Will use the 3D model from file models/gltf/Soldier.glb
         meshName: "vanguard_Mesh", // Name of the main mesh to animate
         position: {x: 0, y: 0, z: 0}, // Where to put the unit in the scene
         scale: 1, // Scaling of the unit. 1.0 means: use original size, 0.1 means "10 times smaller", etc.
         animationName: "Idle" // Name of animation to run
     },
     {
-        modelName: "Soldier",
+        modelName: Soldier,
         meshName: "vanguard_Mesh",
         position: {x: 3, y: 0, z: 0},
         scale: 2,
         animationName: "Walk"
     },
     {
-        modelName: "Soldier",
+        modelName: Soldier,
         meshName: "vanguard_Mesh",
         position: {x: 1, y: 0, z: 0},
         scale: 1,
         animationName: "Run"
     },
     {
-        modelName: "Parrot",
+        modelName: Parrot,
         meshName: "mesh_0",
         position: {x: -4, y: 0, z: 0},
         rotation: {x: 0, y: Math.PI, z: 0},
@@ -61,7 +61,7 @@ var UNITS = [
         animationName: "parrot_A_"
     },
     {
-        modelName: "Parrot",
+        modelName: Parrot,
         meshName: "mesh_0",
         position: {x: -2, y: 0, z: 0},
         rotation: {x: 0, y: Math.PI / 2, z: 0},
@@ -108,7 +108,7 @@ function instantiateUnits() {
     var numSuccess = 0;
     for (var i = 0; i < UNITS.length; ++i) {
         var u = UNITS[i];
-        var model = getModelByName(u.modelName);
+        var model = getModelByName(u.modelName.name);
         if (model) {
             var clonedScene = SkeletonUtils.clone(model.scene);
             if (clonedScene) {
@@ -168,7 +168,7 @@ function startAnimation(skinnedMesh, animations, animationName) {
  */
 function getModelByName(name) {
     for (var i = 0; i < MODELS.length; ++i) {
-        if (MODELS[i].name === name) {
+        if (MODELS[i].name.name === name) {
             return MODELS[i];
         }
     }

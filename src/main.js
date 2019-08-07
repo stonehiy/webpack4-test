@@ -299,23 +299,32 @@ function initStats() {
 
 }
 
+
 function initDatGui() {
     let opts = {
         x: 0,
         y: 0,
-        scale: 1
+        z: 0,
+        scale: 1,
     }
 
     let gui = new dat.GUI()
-    gui.add(opts, 'x', -3, 3)
-    gui.add(opts, 'y', -3, 3)
-    gui.add(opts, 'scale', 1, 3)
-    loop();
+    gui.add(opts, 'x', -3, 3);
+    gui.add(opts, 'y', -3, 3);
+    gui.add(opts, 'z', -3, 3);
+    gui.add(opts, 'scale', 1, 3);
+
+    function loop() {
+        UNITS[0].position.x = opts.x;
+        UNITS[0].position.y = opts.y;
+        UNITS[0].position.z = opts.z;
+        UNITS[0].scale = opts.scale;
+        // requestAnimationFrame(animate);
+    }
+
+    // loop();
+
 }
 
-function loop() {
-    cube.position.x = opt.x
-    cube.position.y = opt.y
-    cube.scale.set(opts.scale, opts.scale, opts.scale)
-    requestAnimationFrame()
-}
+
+

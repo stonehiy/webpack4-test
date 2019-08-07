@@ -7,6 +7,9 @@ import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {SkeletonUtils} from 'three/examples/jsm/utils/SkeletonUtils.js';
 import Soldier from './static/models/gltf/Soldier.glb'
 import Parrot from './static/models/gltf/Parrot.glb'
+import Stats from 'stats.js';
+// ES6:
+import * as dat from 'dat.gui';
 //////////////////////////////
 // Global objects
 //////////////////////////////
@@ -77,6 +80,8 @@ initScene();
 initRenderer();
 loadModels();
 animate();
+initStats();
+initDatGui();
 //////////////////////////////
 //////////////////////////////
 // Function implementations
@@ -276,4 +281,41 @@ function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+function initStats() {
+    var stats = new Stats();
+    stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
+    document.body.appendChild(stats.dom);
+
+    function animate() {
+        stats.begin();
+        // monitored code goes here
+        stats.end();
+        requestAnimationFrame(animate);
+    }
+
+    requestAnimationFrame(animate);
+
+}
+
+function initDatGui() {
+    let opts = {
+        x: 0,
+        y: 0,
+        scale: 1
+    }
+
+    let gui = new dat.GUI()
+    gui.add(opts, 'x', -3, 3)
+    gui.add(opts, 'y', -3, 3)
+    gui.add(opts, 'scale', 1, 3)
+    loop();
+}
+
+function loop() {
+    cube.position.x = opt.x
+    cube.position.y = opt.y
+    cube.scale.set(opts.scale, opts.scale, opts.scale)
+    requestAnimationFrame()
 }

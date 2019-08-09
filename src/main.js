@@ -8,322 +8,324 @@ import {SkeletonUtils} from 'three/examples/jsm/utils/SkeletonUtils.js';
 import Soldier from './static/models/gltf/Soldier.glb'
 import Parrot from './static/models/gltf/Parrot.glb'
 import Stats from 'stats.js';
-// ES6:
-import * as dat from 'dat.gui';
-//////////////////////////////
-// Global objects
-//////////////////////////////
-var worldScene = null; // THREE.Scene where it all will be rendered
-var renderer = null;
-var camera = null;
-var clock = null;
-var mixers = []; // All the THREE.AnimationMixer objects for all the animations in the scene
-//////////////////////////////
-//////////////////////////////
-// Information about our 3D models and units
-//////////////////////////////
-// The names of the 3D models to load. One-per file.
-// A model may have multiple SkinnedMesh objects as well as several rigs (armatures). Units will define which
-// meshes, armatures and animations to use. We will load the whole scene for each object and clone it for each unit.
-// Models are from https://www.mixamo.com/
-var MODELS = [
-    {name: Soldier},
-    {name: Parrot},
-    // { name: "RiflePunch" },
-];
-// Here we define instances of the models that we want to place in the scene, their position, scale and the animations
-// that must be played.
-var UNITS = [
-    {
-        modelName: Soldier, // Will use the 3D model from file models/gltf/Soldier.glb
-        meshName: "vanguard_Mesh", // Name of the main mesh to animate
-        position: {x: 0, y: 0, z: 0}, // Where to put the unit in the scene
-        scale: 1, // Scaling of the unit. 1.0 means: use original size, 0.1 means "10 times smaller", etc.
-        animationName: "Idle" // Name of animation to run
-    },
-    {
-        modelName: Soldier,
-        meshName: "vanguard_Mesh",
-        position: {x: 3, y: 0, z: 0},
-        scale: 2,
-        animationName: "Walk"
-    },
-    {
-        modelName: Soldier,
-        meshName: "vanguard_Mesh",
-        position: {x: 1, y: 0, z: 0},
-        scale: 1,
-        animationName: "Run"
-    },
-    {
-        modelName: Parrot,
-        meshName: "mesh_0",
-        position: {x: -4, y: 0, z: 0},
-        rotation: {x: 0, y: Math.PI, z: 0},
-        scale: 0.01,
-        animationName: "parrot_A_"
-    },
-    {
-        modelName: Parrot,
-        meshName: "mesh_0",
-        position: {x: -2, y: 0, z: 0},
-        rotation: {x: 0, y: Math.PI / 2, z: 0},
-        scale: 0.02,
-        animationName: null
-    },
-];
-//////////////////////////////
-// The main setup happens here
-//////////////////////////////
-var numLoadedModels = 0;
-initScene();
-initRenderer();
-loadModels();
-animate();
-initStats();
-initDatGui();
-//////////////////////////////
-//////////////////////////////
-// Function implementations
-//////////////////////////////
-/**
- * Function that starts loading process for the next model in the queue. The loading process is
- * asynchronous: it happens "in the background". Therefore we don't load all the models at once. We load one,
- * wait until it is done, then load the next one. When all models are loaded, we call loadUnits().
- */
-function loadModels() {
-    for (var i = 0; i < MODELS.length; ++i) {
-        var m = MODELS[i];
-        loadGltfModel(m, function () {
-            ++numLoadedModels;
-            if (numLoadedModels === MODELS.length) {
-                console.log("All models loaded, time to instantiate units...");
-                instantiateUnits();
-            }
-        });
-    }
+import {GUI} from 'dat.gui';
 
-}
 
-/**
- * Look at UNITS configuration, clone necessary 3D model scenes, place the armatures and meshes in the scene and
- * launch necessary animations
- */
-function instantiateUnits() {
-    var numSuccess = 0;
-    for (var i = 0; i < UNITS.length; ++i) {
-        var u = UNITS[i];
-        var model = getModelByName(u.modelName.name);
-        if (model) {
-            var clonedScene = SkeletonUtils.clone(model.scene);
-            if (clonedScene) {
-                // THREE.Scene is cloned properly, let's find one mesh and launch animation for it
-                var clonedMesh = clonedScene.getObjectByName(u.meshName);
-                if (clonedMesh) {
-                    var mixer = startAnimation(clonedMesh, model.animations, u.animationName);
-                    // Save the animation mixer in the list, will need it in the animation loop
-                    mixers.push(mixer);
-                    numSuccess++;
-                }
-                // Different models can have different configurations of armatures and meshes. Therefore,
-                // We can't set position, scale or rotation to individual mesh objects. Instead we set
-                // it to the whole cloned scene and then add the whole scene to the game world
-                // Note: this may have weird effects if you have lights or other items in the GLTF file's scene!
-                worldScene.add(clonedScene);
-                if (u.position) {
-                    clonedScene.position.set(u.position.x, u.position.y, u.position.z);
-                }
-                if (u.scale) {
-                    clonedScene.scale.set(u.scale, u.scale, u.scale);
-                }
-                if (u.rotation) {
-                    clonedScene.rotation.x = u.rotation.x;
-                    clonedScene.rotation.y = u.rotation.y;
-                    clonedScene.rotation.z = u.rotation.z;
-                }
-            }
-        } else {
-            console.error("Can not find model", u.modelName);
-        }
-    }
-    console.log(`Successfully instantiated ${numSuccess} units`);
-}
+var scene, renderer, camera, stats;
+var model, skeleton, mixer, clock;
+var crossFadeControls = [];
+var idleAction, walkAction, runAction;
+var idleWeight, walkWeight, runWeight;
+var actions, settings;
+var singleStepMode = false;
+var sizeOfNextStep = 0;
+init();
 
-/**
- * Start animation for a specific mesh object. Find the animation by name in the 3D model's animation array
- * @param skinnedMesh {THREE.SkinnedMesh} The mesh to animate
- * @param animations {Array} Array containing all the animations for this model
- * @param animationName {string} Name of the animation to launch
- * @return {THREE.AnimationMixer} Mixer to be used in the render loop
- */
-function startAnimation(skinnedMesh, animations, animationName) {
-    var mixer = new THREE.AnimationMixer(skinnedMesh);
-    var clip = THREE.AnimationClip.findByName(animations, animationName);
-    if (clip) {
-        var action = mixer.clipAction(clip);
-        action.play();
-    }
-    return mixer;
-}
-
-/**
- * Find a model object by name
- * @param name
- * @returns {object|null}
- */
-function getModelByName(name) {
-    for (var i = 0; i < MODELS.length; ++i) {
-        if (MODELS[i].name.name === name) {
-            return MODELS[i];
-        }
-    }
-    return null;
-}
-
-/**
- * Load a 3D model from a GLTF file. Use the GLTFLoader.
- * @param model {object} Model config, one item from the MODELS array. It will be updated inside the function!
- * @param onLoaded {function} A callback function that will be called when the model is loaded
- */
-function loadGltfModel(model, onLoaded) {
-    var loader = new GLTFLoader();
-    // var modelName = "static/models/gltf/" + model.name + ".glb";
-    loader.load(model.name, function (gltf) {
-        var scene = gltf.scene;
-        model.animations = gltf.animations;
-        model.scene = scene;
-        // Enable Shadows
-        gltf.scene.traverse(function (object) {
-            if (object.isMesh) {
-                object.castShadow = true;
-            }
-        });
-        console.log("Done loading model", model.name);
-        onLoaded();
-    });
-}
-
-/**
- * Render loop. Renders the next frame of all animations
- */
-function animate() {
-    requestAnimationFrame(animate);
-    // Get the time elapsed since the last frame
-    var mixerUpdateDelta = clock.getDelta();
-    // Update all the animation frames
-    for (var i = 0; i < mixers.length; ++i) {
-        mixers[i].update(mixerUpdateDelta);
-    }
-    renderer.render(worldScene, camera);
-}
-
-//////////////////////////////
-// General Three.JS stuff
-//////////////////////////////
-// This part is not anyhow related to the cloning of models, it's just setting up the scene.
-/**
- * Initialize ThreeJS scene renderer
- */
-function initRenderer() {
+function init() {
     var container = document.getElementById('container');
+    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 1000);
+    camera.position.set(1, 2, -3);
+    camera.lookAt(0, 1, 0);
+    clock = new THREE.Clock();
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xa0a0a0);
+    scene.fog = new THREE.Fog(0xa0a0a0, 10, 50);
+    var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444);
+    hemiLight.position.set(0, 20, 0);
+    scene.add(hemiLight);
+    var dirLight = new THREE.DirectionalLight(0xffffff);
+    dirLight.position.set(-3, 10, -10);
+    dirLight.castShadow = true;
+    dirLight.shadow.camera.top = 2;
+    dirLight.shadow.camera.bottom = -2;
+    dirLight.shadow.camera.left = -2;
+    dirLight.shadow.camera.right = 2;
+    dirLight.shadow.camera.near = 0.1;
+    dirLight.shadow.camera.far = 40;
+    scene.add(dirLight);
+    // scene.add( new CameraHelper( light.shadow.camera ) );
+    // ground
+    var mesh = new THREE.Mesh(new THREE.PlaneBufferGeometry(100, 100), new THREE.MeshPhongMaterial({
+        color: 0x999999,
+        depthWrite: false
+    }));
+    mesh.rotation.x = -Math.PI / 2;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    var loader = new GLTFLoader();
+    loader.load(Soldier, function (gltf) {
+        model = gltf.scene;
+        scene.add(model);
+        model.traverse(function (object) {
+            if (object.isMesh) object.castShadow = true;
+        });
+        //
+        skeleton = new THREE.SkeletonHelper(model);
+        skeleton.visible = false;
+        scene.add(skeleton);
+        //
+        createPanel();
+        //
+        var animations = gltf.animations;
+        mixer = new THREE.AnimationMixer(model);
+        idleAction = mixer.clipAction(animations[0]);
+        walkAction = mixer.clipAction(animations[3]);
+        runAction = mixer.clipAction(animations[1]);
+        actions = [idleAction, walkAction, runAction];
+        activateAllActions();
+        animate();
+    });
     renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.gammaOutput = true;
     renderer.gammaFactor = 2.2;
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     container.appendChild(renderer.domElement);
-}
-
-/**
- * Initialize ThreeJS THREE.Scene
- */
-function initScene() {
-    camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 1, 10000);
-    camera.position.set(3, 6, -10);
-    camera.lookAt(0, 1, 0);
-    clock = new THREE.Clock();
-    worldScene = new THREE.Scene();
-    worldScene.background = new THREE.Color(0xa0a0a0);
-    worldScene.fog = new THREE.Fog(0xa0a0a0, 10, 22);
-    var hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444);
-    hemiLight.position.set(0, 20, 0);
-    worldScene.add(hemiLight);
-    var dirLight = new THREE.DirectionalLight(0xffffff);
-    dirLight.position.set(-3, 10, -10);
-    dirLight.castShadow = true;
-    dirLight.shadow.camera.top = 10;
-    dirLight.shadow.camera.bottom = -10;
-    dirLight.shadow.camera.left = -10;
-    dirLight.shadow.camera.right = 10;
-    dirLight.shadow.camera.near = 0.1;
-    dirLight.shadow.camera.far = 40;
-    worldScene.add(dirLight);
-    // ground
-    var groundMesh = new THREE.Mesh(
-        new THREE.PlaneBufferGeometry(40, 40),
-        new THREE.MeshPhongMaterial({
-            color: 0x999999,
-            depthWrite: false
-        })
-    );
-    groundMesh.rotation.x = -Math.PI / 2;
-    groundMesh.receiveShadow = true;
-    worldScene.add(groundMesh);
+    stats = new Stats();
+    container.appendChild(stats.dom);
     window.addEventListener('resize', onWindowResize, false);
 }
 
-/**
- * A callback that will be called whenever the browser window is resized.
- */
+function createPanel() {
+    var panel = new GUI({width: 310});
+    var folder1 = panel.addFolder('Visibility');
+    var folder2 = panel.addFolder('Activation/Deactivation');
+    var folder3 = panel.addFolder('Pausing/Stepping');
+    var folder4 = panel.addFolder('Crossfading');
+    var folder5 = panel.addFolder('Blend Weights');
+    var folder6 = panel.addFolder('General Speed');
+    settings = {
+        'show model': true,
+        'show skeleton': false,
+        'deactivate all': deactivateAllActions,
+        'activate all': activateAllActions,
+        'pause/continue': pauseContinue,
+        'make single step': toSingleStepMode,
+        'modify step size': 0.05,
+        'from walk to idle': function () {
+            prepareCrossFade(walkAction, idleAction, 1.0);
+        },
+        'from idle to walk': function () {
+            prepareCrossFade(idleAction, walkAction, 0.5);
+        },
+        'from walk to run': function () {
+            prepareCrossFade(walkAction, runAction, 2.5);
+        },
+        'from run to walk': function () {
+            prepareCrossFade(runAction, walkAction, 5.0);
+        },
+        'use default duration': true,
+        'set custom duration': 3.5,
+        'modify idle weight': 0.0,
+        'modify walk weight': 1.0,
+        'modify run weight': 0.0,
+        'modify time scale': 1.0
+    };
+    folder1.add(settings, 'show model').onChange(showModel);
+    folder1.add(settings, 'show skeleton').onChange(showSkeleton);
+    folder2.add(settings, 'deactivate all');
+    folder2.add(settings, 'activate all');
+    folder3.add(settings, 'pause/continue');
+    folder3.add(settings, 'make single step');
+    folder3.add(settings, 'modify step size', 0.01, 0.1, 0.001);
+    crossFadeControls.push(folder4.add(settings, 'from walk to idle'));
+    crossFadeControls.push(folder4.add(settings, 'from idle to walk'));
+    crossFadeControls.push(folder4.add(settings, 'from walk to run'));
+    crossFadeControls.push(folder4.add(settings, 'from run to walk'));
+    folder4.add(settings, 'use default duration');
+    folder4.add(settings, 'set custom duration', 0, 10, 0.01);
+    folder5.add(settings, 'modify idle weight', 0.0, 1.0, 0.01).listen().onChange(function (weight) {
+        setWeight(idleAction, weight);
+    });
+    folder5.add(settings, 'modify walk weight', 0.0, 1.0, 0.01).listen().onChange(function (weight) {
+        setWeight(walkAction, weight);
+    });
+    folder5.add(settings, 'modify run weight', 0.0, 1.0, 0.01).listen().onChange(function (weight) {
+        setWeight(runAction, weight);
+    });
+    folder6.add(settings, 'modify time scale', 0.0, 1.5, 0.01).onChange(modifyTimeScale);
+    folder1.open();
+    folder2.open();
+    folder3.open();
+    folder4.open();
+    folder5.open();
+    folder6.open();
+    crossFadeControls.forEach(function (control) {
+        control.classList1 = control.domElement.parentElement.parentElement.classList;
+        control.classList2 = control.domElement.previousElementSibling.classList;
+        control.setDisabled = function () {
+            control.classList1.add('no-pointer-events');
+            control.classList2.add('control-disabled');
+        };
+        control.setEnabled = function () {
+            control.classList1.remove('no-pointer-events');
+            control.classList2.remove('control-disabled');
+        };
+    });
+}
+
+function showModel(visibility) {
+    model.visible = visibility;
+}
+
+function showSkeleton(visibility) {
+    skeleton.visible = visibility;
+}
+
+function modifyTimeScale(speed) {
+    mixer.timeScale = speed;
+}
+
+function deactivateAllActions() {
+    actions.forEach(function (action) {
+        action.stop();
+    });
+}
+
+function activateAllActions() {
+    setWeight(idleAction, settings['modify idle weight']);
+    setWeight(walkAction, settings['modify walk weight']);
+    setWeight(runAction, settings['modify run weight']);
+    actions.forEach(function (action) {
+        action.play();
+    });
+}
+
+function pauseContinue() {
+    if (singleStepMode) {
+        singleStepMode = false;
+        unPauseAllActions();
+    } else {
+        if (idleAction.paused) {
+            unPauseAllActions();
+        } else {
+            pauseAllActions();
+        }
+    }
+}
+
+function pauseAllActions() {
+    actions.forEach(function (action) {
+        action.paused = true;
+    });
+}
+
+function unPauseAllActions() {
+    actions.forEach(function (action) {
+        action.paused = false;
+    });
+}
+
+function toSingleStepMode() {
+    unPauseAllActions();
+    singleStepMode = true;
+    sizeOfNextStep = settings['modify step size'];
+}
+
+function prepareCrossFade(startAction, endAction, defaultDuration) {
+    // Switch default / custom crossfade duration (according to the user's choice)
+    var duration = setCrossFadeDuration(defaultDuration);
+    // Make sure that we don't go on in singleStepMode, and that all actions are unpaused
+    singleStepMode = false;
+    unPauseAllActions();
+    // If the current action is 'idle' (duration 4 sec), execute the crossfade immediately;
+    // else wait until the current action has finished its current loop
+    if (startAction === idleAction) {
+        executeCrossFade(startAction, endAction, duration);
+    } else {
+        synchronizeCrossFade(startAction, endAction, duration);
+    }
+}
+
+function setCrossFadeDuration(defaultDuration) {
+    // Switch default crossfade duration <-> custom crossfade duration
+    if (settings['use default duration']) {
+        return defaultDuration;
+    } else {
+        return settings['set custom duration'];
+    }
+}
+
+function synchronizeCrossFade(startAction, endAction, duration) {
+    mixer.addEventListener('loop', onLoopFinished);
+
+    function onLoopFinished(event) {
+        if (event.action === startAction) {
+            mixer.removeEventListener('loop', onLoopFinished);
+            executeCrossFade(startAction, endAction, duration);
+        }
+    }
+}
+
+function executeCrossFade(startAction, endAction, duration) {
+    // Not only the start action, but also the end action must get a weight of 1 before fading
+    // (concerning the start action this is already guaranteed in this place)
+    setWeight(endAction, 1);
+    endAction.time = 0;
+    // Crossfade with warping - you can also try without warping by setting the third parameter to false
+    startAction.crossFadeTo(endAction, duration, true);
+}
+
+// This function is needed, since animationAction.crossFadeTo() disables its start action and sets
+// the start action's timeScale to ((start animation's duration) / (end animation's duration))
+function setWeight(action, weight) {
+    action.enabled = true;
+    action.setEffectiveTimeScale(1);
+    action.setEffectiveWeight(weight);
+}
+
+// Called by the render loop
+function updateWeightSliders() {
+    settings['modify idle weight'] = idleWeight;
+    settings['modify walk weight'] = walkWeight;
+    settings['modify run weight'] = runWeight;
+}
+
+// Called by the render loop
+function updateCrossFadeControls() {
+    crossFadeControls.forEach(function (control) {
+        control.setDisabled();
+    });
+    if (idleWeight === 1 && walkWeight === 0 && runWeight === 0) {
+        crossFadeControls[1].setEnabled();
+    }
+    if (idleWeight === 0 && walkWeight === 1 && runWeight === 0) {
+        crossFadeControls[0].setEnabled();
+        crossFadeControls[2].setEnabled();
+    }
+    if (idleWeight === 0 && walkWeight === 0 && runWeight === 1) {
+        crossFadeControls[3].setEnabled();
+    }
+}
+
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-function initStats() {
-    var stats = new Stats();
-    stats.showPanel(0); // 0: fps, 1: ms, 2: mb, 3+: custom
-    document.body.appendChild(stats.dom);
-
-    function animate() {
-        stats.begin();
-        // monitored code goes here
-        stats.end();
-        requestAnimationFrame(animate);
-    }
-
+function animate() {
+    // Render loop
     requestAnimationFrame(animate);
-
-}
-
-
-function initDatGui() {
-    let opts = {
-        x: 0,
-        y: 0,
-        z: 0,
-        scale: 1,
+    idleWeight = idleAction.getEffectiveWeight();
+    walkWeight = walkAction.getEffectiveWeight();
+    runWeight = runAction.getEffectiveWeight();
+    // Update the panel values if weights are modified from "outside" (by crossfadings)
+    updateWeightSliders();
+    // Enable/disable crossfade controls according to current weight values
+    updateCrossFadeControls();
+    // Get the time elapsed since the last frame, used for mixer update (if not in single step mode)
+    var mixerUpdateDelta = clock.getDelta();
+    // If in single step mode, make one step and then do nothing (until the user clicks again)
+    if (singleStepMode) {
+        mixerUpdateDelta = sizeOfNextStep;
+        sizeOfNextStep = 0;
     }
-
-    let gui = new dat.GUI()
-    gui.add(opts, 'x', -3, 3);
-    gui.add(opts, 'y', -3, 3);
-    gui.add(opts, 'z', -3, 3);
-    gui.add(opts, 'scale', 1, 3);
-
-    function loop() {
-        UNITS[0].position.x = opts.x;
-        UNITS[0].position.y = opts.y;
-        UNITS[0].position.z = opts.z;
-        UNITS[0].scale = opts.scale;
-        // requestAnimationFrame(animate);
-    }
-
-    // loop();
-
+    // Update the animation mixer, the stats panel, and render this frame
+    mixer.update(mixerUpdateDelta);
+    stats.update();
+    renderer.render(scene, camera);
 }
 
 
